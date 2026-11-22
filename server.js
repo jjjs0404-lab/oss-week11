@@ -18,6 +18,7 @@ import { getDaily } from "./openMeteo.js";
 
 const app = express();
 const port = process.env.PORT ?? 3000;
+const counts = {};
 
 app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
@@ -29,20 +30,35 @@ const CITIES = {
   gangneung: { name: "Gangneung", lat: 37.7519, lon: 128.8761 },
 };
 
+
 app.use(express.static("public"));
+
+if(!process.env.ADMIN_TOKEN) {
+    console.error("ADMIN_TOKEN is not set. Copy .env.example to .env.");
+    process.exit(1);
+}
 
 app.get("/api/forecast", async (req, res) => {
     if (!Object.hasOwn(CITIES, req.query.city)) {
         return res.status(400).json({ error: `Unknown city: ${req.query.city}` });
     }
     const city = CITIES[req.query.city];
+    counts[req.query.city] = (counts[req.query.city] ?? 0) + 1;
     try {
         const days = toDays(await getDaily(city));
         res.json({ city: city.name, days });
     } catch (err) {
         res.status(502).json({ error: err.message });
-  }
+    }
 });
+
+app.get("/api/stats", (req, res) => {
+    if(req.get("Authorization") !== `Bearer ${process.env.ADMIN_TOKEN}`) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+    res.json(counts);
+});
+
 
 app.listen(port, (error) => {
     if (error) throw error; // e.g. the port is already in use
