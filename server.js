@@ -13,12 +13,35 @@
 // P4 부터 여기 아래에 씁니다.
 
 import express from "express";
+import { toDays } from "./public/logic.js";
+import { getDaily } from "./openMeteo.js";
 
 const app = express();
 const port = process.env.PORT ?? 3000;
 
 app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+});
+
+const CITIES = {
+  seoul: { name: "Seoul", lat: 37.566, lon: 126.9784 },
+  daejeon: { name: "Daejeon", lat: 36.3504, lon: 127.3845 },
+  gangneung: { name: "Gangneung", lat: 37.7519, lon: 128.8761 },
+};
+
+app.use(express.static("public"));
+
+app.get("/api/forecast", async (req, res) => {
+    if (!Object.hasOwn(CITIES, req.query.city)) {
+        return res.status(400).json({ error: `Unknown city: ${req.query.city}` });
+    }
+    const city = CITIES[req.query.city];
+    try {
+        const days = toDays(await getDaily(city));
+        res.json({ city: city.name, days });
+    } catch (err) {
+        res.status(502).json({ error: err.message });
+  }
 });
 
 app.listen(port, (error) => {
